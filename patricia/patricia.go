@@ -23,8 +23,8 @@ const (
 )
 
 var (
-	maxPrefixPerNode         int
-	maxChildrenPerSparseNode int
+	maxPrefixPerNode         = DefaultMaxPrefixPerNode
+	maxChildrenPerSparseNode = DefaultMaxChildrenPerSparseNode
 )
 
 type (
@@ -56,13 +56,6 @@ func NewTrie(options ...Option) *Trie {
 
 	for _, opt := range options {
 		opt(trie)
-	}
-
-	if maxPrefixPerNode <= 0 {
-		maxPrefixPerNode = DefaultMaxPrefixPerNode
-	}
-	if maxChildrenPerSparseNode <= 0 {
-		maxChildrenPerSparseNode = DefaultMaxChildrenPerSparseNode
 	}
 
 	trie.children = newSparseChildList(maxChildrenPerSparseNode)
