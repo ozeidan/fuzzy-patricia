@@ -25,6 +25,7 @@ const (
 var (
 	maxPrefixPerNode         = DefaultMaxPrefixPerNode
 	maxChildrenPerSparseNode = DefaultMaxChildrenPerSparseNode
+	useSuperDenseChildLists  = false
 )
 
 type (
@@ -48,31 +49,30 @@ type Trie struct {
 
 // Public API ------------------------------------------------------------------
 
-type Option func(*Trie)
-
 // Trie constructor.
-func NewTrie(options ...Option) *Trie {
+func NewTrie() *Trie {
 	trie := &Trie{}
 
-	for _, opt := range options {
-		opt(trie)
+	if !useSuperDenseChildLists {
+		trie.children = newSparseChildList(maxChildrenPerSparseNode)
+	} else {
+		trie.children = newSuperDenseChildList()
 	}
 
-	trie.children = newSparseChildList(maxChildrenPerSparseNode)
 	trie.mask = 0
 	return trie
 }
 
-func MaxPrefixPerNode(value int) Option {
-	return func(trie *Trie) {
-		maxPrefixPerNode = value
-	}
+func SetMaxPrefixPerNode(value int) {
+	maxPrefixPerNode = value
 }
 
-func MaxChildrenPerSparseNode(value int) Option {
-	return func(trie *Trie) {
-		maxChildrenPerSparseNode = value
-	}
+func SetMaxChildrenPerSparseNode(value int) {
+	maxChildrenPerSparseNode = value
+}
+
+func SetUseSuperDenseChildLists(use bool) {
+	useSuperDenseChildLists = use
 }
 
 // Clone makes a copy of an existing trie.
@@ -553,7 +553,11 @@ func (trie *Trie) empty() bool {
 
 func (trie *Trie) reset() {
 	trie.prefix = nil
-	trie.children = newSparseChildList(maxPrefixPerNode)
+	if !useSuperDenseChildLists {
+		trie.children = newSparseChildList(maxChildrenPerSparseNode)
+	} else {
+		trie.children = newSuperDenseChildList()
+	}
 }
 
 func makePrefixMask(key Prefix) uint64 {

@@ -403,3 +403,133 @@ func (list *denseChildList) total() int {
 	}
 	return tot
 }
+
+type childContainer struct {
+	char byte
+	node *Trie
+}
+type superDenseChildList struct {
+	children []childContainer
+}
+
+func newSuperDenseChildList() childList {
+	return &superDenseChildList{
+		make([]childContainer, 0),
+	}
+}
+
+func (list *superDenseChildList) length() int {
+	return len(list.children)
+}
+
+func (list *superDenseChildList) head() *Trie {
+	if len(list.children) > 0 {
+		return list.children[0].node
+	}
+	return nil
+}
+
+func (list *superDenseChildList) add(child *Trie) childList {
+	char := child.prefix[0]
+	list.children = append(list.children, childContainer{
+		char,
+		child,
+	})
+	return list
+}
+
+func (list *superDenseChildList) remove(b byte) {
+	childs := list.children
+	for i := 0; i < len(list.children); i++ {
+		if childs[i].char == b {
+			childs[i] = childs[len(childs)-1]
+			childs[len(childs)-1] = childContainer{}
+			childs = childs[:len(childs)-1]
+			return
+		}
+	}
+}
+
+func (list *superDenseChildList) replace(b byte, child *Trie) {
+	childs := list.children
+	for i := 0; i < len(list.children); i++ {
+		if childs[i].char == b {
+			childs[i].node = child
+			return
+		}
+	}
+}
+
+func (list *superDenseChildList) next(b byte) *Trie {
+	childs := list.children
+	for i := 0; i < len(list.children); i++ {
+		if childs[i].char == b {
+			return childs[i].node
+		}
+	}
+	return nil
+}
+
+func (list superDenseChildList) combinedMask() uint64 {
+	var mask uint64
+	for _, child := range list.children {
+		mask |= child.node.mask
+	}
+	return mask
+}
+
+func (list *superDenseChildList) getChildren() []*Trie {
+	children := make([]*Trie, 0, len(list.children))
+	for _, child := range list.children {
+		children = append(children, child.node)
+	}
+	return children
+}
+
+func (list *superDenseChildList) walk(prefix *Prefix, visitor VisitorFunc) error {
+	for _, child := range list.children {
+		node := child.node
+		*prefix = append(*prefix, node.prefix...)
+		if node.item != nil {
+			if err := visitor(*prefix, node.item); err != nil {
+				if err == SkipSubtree {
+					*prefix = (*prefix)[:len(*prefix)-len(node.prefix)]
+					continue
+				}
+				*prefix = (*prefix)[:len(*prefix)-len(node.prefix)]
+				return err
+			}
+		}
+
+		err := node.children.walk(prefix, visitor)
+		*prefix = (*prefix)[:len(*prefix)-len(node.prefix)]
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (list *superDenseChildList) print(w io.Writer, indent int) {
+	for _, child := range list.children {
+		child.node.print(w, indent)
+	}
+}
+
+func (list *superDenseChildList) clone() childList {
+	clones := make([]childContainer, len(list.children))
+
+	for i := 0; i < len(list.children); i++ {
+		child := list.children[i]
+		clones[i] = childContainer{child.char, child.node.Clone()}
+	}
+
+	return &superDenseChildList{
+		clones,
+	}
+}
+
+func (list *superDenseChildList) total() int {
+	return len(list.children)
+}
