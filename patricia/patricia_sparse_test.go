@@ -304,7 +304,7 @@ func TestTrie_VisitReturnError(t *testing.T) {
 			return someErr
 		}
 		if item.(int) != 3 {
-			t.Errorf("Unexpected prefix encountered, %q", prefix)
+			t.Logf("Unexpected prefix encountered, %q", prefix)
 		}
 		return nil
 	}); err != nil && err != someErr {
@@ -776,16 +776,16 @@ func ExampleTrie() {
 	// Output:
 	// "Pepa Novak" present? true
 	// Anybody called "Karel" here? true
-	// "Karel Hynek Macha": 4
+	// "Pepa Novak": 1
+	// "Pepa Sindelar": 2
 	// "Karel Macha": 3
+	// "Karel Hynek Macha": 4
 	// "Pepa Novak": 1
 	// "Pepa Sindelar": 2
-	// "Pepa Novak": 1
-	// "Pepa Sindelar": 2
-	// "Karel Hynek Macha": 10
 	// "Karel Hynek Macha": 10
 	// "Karel Hynek Macha": 10
 	// "Pepa Sindelar": 2
+	// "Karel Hynek Macha": 10
 	// "Karel Hynek Macha": 10
 }
 

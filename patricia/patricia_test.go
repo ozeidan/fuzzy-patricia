@@ -468,7 +468,6 @@ var benchmarkTrie *Trie
 
 func populateBenchmarkTrie(superDenseChildList bool) {
 	benchmarkTrie = NewTrie()
-	SetUseSuperDenseChildLists(superDenseChildList)
 
 	for i := 0; i < amountWords; i++ {
 		benchmarkTrie.Insert(Prefix(mrandBytes(wordLength)), struct{}{})

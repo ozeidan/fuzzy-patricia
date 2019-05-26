@@ -18,14 +18,11 @@ import (
 //------------------------------------------------------------------------------
 
 const (
-	defaultMaxPrefixPerNode         = 10
-	defaultMaxChildrenPerSparseNode = 8
+	defaultMaxPrefixPerNode = 10
 )
 
 var (
-	maxPrefixPerNode         = defaultMaxPrefixPerNode
-	maxChildrenPerSparseNode = defaultMaxChildrenPerSparseNode
-	useSuperDenseChildLists  = false
+	maxPrefixPerNode = defaultMaxPrefixPerNode
 )
 
 type (
@@ -57,11 +54,7 @@ type Trie struct {
 func NewTrie() *Trie {
 	trie := &Trie{}
 
-	if !useSuperDenseChildLists {
-		trie.children = newSparseChildList(maxChildrenPerSparseNode)
-	} else {
-		trie.children = newSuperDenseChildList()
-	}
+	trie.children = newSuperDenseChildList()
 
 	trie.mask = 0
 	return trie
@@ -70,14 +63,6 @@ func NewTrie() *Trie {
 // SetMaxPrefixPerNode sets the maximum length of a prefix before it is split into two nodes
 func SetMaxPrefixPerNode(value int) {
 	maxPrefixPerNode = value
-}
-
-func SetMaxChildrenPerSparseNode(value int) {
-	maxChildrenPerSparseNode = value
-}
-
-func SetUseSuperDenseChildLists(use bool) {
-	useSuperDenseChildLists = use
 }
 
 // Clone makes a copy of an existing trie.
@@ -605,11 +590,7 @@ func (trie *Trie) empty() bool {
 
 func (trie *Trie) reset() {
 	trie.prefix = nil
-	if !useSuperDenseChildLists {
-		trie.children = newSparseChildList(maxChildrenPerSparseNode)
-	} else {
-		trie.children = newSuperDenseChildList()
-	}
+	trie.children = newSuperDenseChildList()
 }
 
 func makePrefixMask(key Prefix) uint64 {
