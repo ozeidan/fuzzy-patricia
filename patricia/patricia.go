@@ -18,20 +18,24 @@ import (
 //------------------------------------------------------------------------------
 
 const (
-	DefaultMaxPrefixPerNode         = 10
-	DefaultMaxChildrenPerSparseNode = 8
+	defaultMaxPrefixPerNode         = 10
+	defaultMaxChildrenPerSparseNode = 8
 )
 
 var (
-	maxPrefixPerNode         = DefaultMaxPrefixPerNode
-	maxChildrenPerSparseNode = DefaultMaxChildrenPerSparseNode
+	maxPrefixPerNode         = defaultMaxPrefixPerNode
+	maxChildrenPerSparseNode = defaultMaxChildrenPerSparseNode
 	useSuperDenseChildLists  = false
 )
 
 type (
-	Prefix           []byte
-	Item             interface{}
-	VisitorFunc      func(prefix Prefix, item Item) error
+	// Prefix is the type of node prefixes
+	Prefix []byte
+	// Item is just interface{}
+	Item interface{}
+	// VisitorFunc is the type of functions passed to visit function
+	VisitorFunc func(prefix Prefix, item Item) error
+	// FuzzyVisitorFunc additionaly returns how many characters were skipped which can be sorted on
 	FuzzyVisitorFunc func(prefix Prefix, item Item, skipped int) error
 )
 
@@ -49,7 +53,7 @@ type Trie struct {
 
 // Public API ------------------------------------------------------------------
 
-// Trie constructor.
+// NewTrie constructs a new trie.
 func NewTrie() *Trie {
 	trie := &Trie{}
 
@@ -63,6 +67,7 @@ func NewTrie() *Trie {
 	return trie
 }
 
+// SetMaxPrefixPerNode sets the maximum length of a prefix before it is split into two nodes
 func SetMaxPrefixPerNode(value int) {
 	maxPrefixPerNode = value
 }
@@ -145,10 +150,14 @@ func (trie *Trie) Visit(visitor VisitorFunc) error {
 func (trie *Trie) size() int {
 	n := 0
 
-	trie.walk(nil, func(prefix Prefix, item Item) error {
+	err := trie.walk(nil, func(prefix Prefix, item Item) error {
 		n++
 		return nil
 	})
+
+	if err != nil {
+		panic(err)
+	}
 
 	return n
 }
@@ -187,9 +196,10 @@ type potentialSubtree struct {
 	node    *Trie
 }
 
-func (node *Trie) VisitFuzzy(partial Prefix, caseInsensitive bool, visitor FuzzyVisitorFunc) error {
+// VisitFuzzy visits every node that is succesfully matched via fuzzy matching
+func (trie *Trie) VisitFuzzy(partial Prefix, caseInsensitive bool, visitor FuzzyVisitorFunc) error {
 	if len(partial) == 0 {
-		return node.VisitPrefixes(partial, caseInsensitive, func(prefix Prefix, item Item) error {
+		return trie.VisitPrefixes(partial, caseInsensitive, func(prefix Prefix, item Item) error {
 			return visitor(prefix, item, 0)
 		})
 	}
@@ -201,7 +211,7 @@ func (node *Trie) VisitFuzzy(partial Prefix, caseInsensitive bool, visitor Fuzzy
 		p   potentialSubtree
 	)
 
-	potential := []potentialSubtree{potentialSubtree{node: node, prefix: Prefix(""), idx: 0}}
+	potential := []potentialSubtree{potentialSubtree{node: trie, prefix: Prefix(""), idx: 0}}
 	for l := len(potential); l > 0; l = len(potential) {
 		i = l - 1
 		p = potential[i]
@@ -293,10 +303,10 @@ func fuzzyMatchCount(prefix, query Prefix, idx int, caseInsensitive bool) (count
 	return
 }
 
-// VisitSubstring takes a substring and visits all the nodes that contain this substring
-func (node *Trie) VisitSubstring(substring Prefix, caseInsensitive bool, visitor VisitorFunc) error {
+// VisitSubstring takes a substring and visits all the nodes that whos prefix contains this substring
+func (trie *Trie) VisitSubstring(substring Prefix, caseInsensitive bool, visitor VisitorFunc) error {
 	if len(substring) == 0 {
-		return node.VisitSubtree(substring, visitor)
+		return trie.VisitSubtree(substring, visitor)
 	}
 
 	var (
@@ -308,7 +318,7 @@ func (node *Trie) VisitSubstring(substring Prefix, caseInsensitive bool, visitor
 		maxSuffixLen = len(substring) - 1
 	)
 
-	potential := []potentialSubtree{potentialSubtree{node: node, prefix: nil}}
+	potential := []potentialSubtree{potentialSubtree{node: trie, prefix: nil}}
 	for l := len(potential); l > 0; l = len(potential) {
 		i = l - 1
 		p = potential[i]
@@ -603,7 +613,7 @@ func (trie *Trie) reset() {
 }
 
 func makePrefixMask(key Prefix) uint64 {
-	var mask uint64 = 0
+	var mask uint64
 	for _, b := range key {
 		if b >= '0' && b <= '9' {
 			// 0-9 bits: 0-9
@@ -645,7 +655,7 @@ func (trie *Trie) put(key Prefix, item Item, replace bool) (inserted bool) {
 
 	var (
 		common int
-		node   *Trie = trie
+		node   = trie
 		child  *Trie
 		mask   uint64
 	)

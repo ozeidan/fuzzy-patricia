@@ -205,8 +205,8 @@ func (list *denseChildList) getChildren() []*Trie {
 
 func newDenseChildList(list *sparseChildList, child *Trie) childList {
 	var (
-		min int = 255
-		max int = 0
+		min = 255
+		max int
 	)
 	for _, child := range list.children {
 		b := int(child.prefix[0])

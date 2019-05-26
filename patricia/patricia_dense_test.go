@@ -62,7 +62,7 @@ func TestTrie_InsertDensePreceeding(t *testing.T) {
 	trie := NewTrie()
 	start := byte(70)
 	// create a dense node
-	for i := byte(0); i <= DefaultMaxChildrenPerSparseNode; i++ {
+	for i := byte(0); i <= defaultMaxChildrenPerSparseNode; i++ {
 		if !trie.Insert(Prefix([]byte{start + i}), true) {
 			t.Errorf("insert failed, prefix=%v", start+i)
 		}
