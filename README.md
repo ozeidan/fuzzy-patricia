@@ -1,43 +1,39 @@
-# go-patricia #
+# fuzzy-patricia #
 
-**Documentation**: [GoDoc](http://godoc.org/github.com/tchap/go-patricia/patricia)<br />
-**Test Coverage**: [![Coverage
-Status](https://coveralls.io/repos/tchap/go-patricia/badge.png)](https://coveralls.io/r/tchap/go-patricia)
+**Documentation**: [GoDoc](http://godoc.org/github.com/ozeidan/fuzzy-patricia/patricia)<br />
 
 ## About ##
+A generic patricia trie (also called radix tree) implemented in Go.
 
-A generic patricia trie (also called radix tree) implemented in Go (Golang).
+This is a fork of [go-patricia](https://github.com/tchap/go-patricia),
+which is optimized for memory consumption and also has slightly better
+performance. It additionally provides the functionality for fuzzy and substring
+searching on the inserted keys.
 
-The patricia trie as implemented in this library enables fast visiting of items
-in some particular ways:
+The patricia trie as implemented in this package enables fast visiting of items
+in the following ways:
 
-1. visit all items saved in the tree,
-2. visit all items matching particular prefix (visit subtree), or
-3. given a string, visit all items matching some prefix of that string.
+1. Visit all items saved in the tree,
+2. Visit all items matching particular prefix (visit subtree).
+3. Visit items by fuzzy matching a query to the nodes keys.
+3. Visit items by searching for a query inside the nodes keys.
+3. Given a string, visit all items matching some prefix of that string.
 
 `[]byte` type is used for keys, `interface{}` for values.
-
 `Trie` is not thread safe. Synchronize the access yourself.
-
-### State of the Project ###
-
-Apparently some people are using this, so the API should not change often.
-Any ideas on how to make the library better are still welcome.
-
-More (unit) testing would be cool as well...
 
 ## Usage ##
 
 Import the package from GitHub first.
 
 ```go
-import "github.com/tchap/go-patricia/patricia"
+import "github.com/ozeidan/fuzzy-patricia/patricia"
 ```
 
-You can as well use gopkg.in thingie:
+You can also import from gopkg.in, recommended when using go modules:
 
 ```go
-import "gopkg.in/tchap/go-patricia.v2/patricia"
+import "gopkg.in/ozeidan/fuzzy-patricia.v3/patricia"
 ```
 
 Then you can start having fun.
@@ -109,9 +105,4 @@ trie.Visit(printItem)
 ```
 
 ## License ##
-
 MIT, check the `LICENSE` file.
-
-[![Gittip
-Badge](http://img.shields.io/gittip/alanhamlett.png)](https://www.gittip.com/tchap/
-"Gittip Badge")
