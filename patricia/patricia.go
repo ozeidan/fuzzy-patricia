@@ -187,11 +187,12 @@ type potentialSubtree struct {
 	node    *Trie
 }
 
-func (node *Trie) VisitFuzzy(partial Prefix, visitor FuzzyVisitorFunc) error {
+func (node *Trie) VisitFuzzy(partial Prefix, caseInsensitive bool, visitor FuzzyVisitorFunc) error {
 	var (
-		m uint64
-		i int
-		p potentialSubtree
+		m   uint64
+		cmp uint64
+		i   int
+		p   potentialSubtree
 	)
 
 	potential := []potentialSubtree{potentialSubtree{node: node, prefix: Prefix(""), idx: 0}}
@@ -202,12 +203,18 @@ func (node *Trie) VisitFuzzy(partial Prefix, visitor FuzzyVisitorFunc) error {
 		potential = potential[:i]
 		m = makePrefixMask(partial[p.idx:])
 
-		if (p.node.mask & m) != m {
+		if caseInsensitive {
+			cmp = caseInsensitiveMask(p.node.mask)
+		} else {
+			cmp = p.node.mask
+		}
+
+		if (cmp & m) != m {
 			continue
 		}
 
 		matchCount, skipped := fuzzyMatchCount(p.node.prefix,
-			partial[p.idx:], p.idx)
+			partial[p.idx:], p.idx, caseInsensitive)
 		p.idx += matchCount
 		if p.idx != 0 {
 			p.skipped += skipped
@@ -255,10 +262,17 @@ func (node *Trie) VisitFuzzy(partial Prefix, visitor FuzzyVisitorFunc) error {
 	return nil
 }
 
-func fuzzyMatchCount(prefix, query Prefix, idx int) (count, skipped int) {
+func fuzzyMatchCount(prefix, query Prefix, idx int, caseInsensitive bool) (count, skipped int) {
 	for i := 0; i < len(prefix); i++ {
+		var match bool
 
-		if prefix[i] != query[count] {
+		if caseInsensitive {
+			match = matchCaseInsensitive(prefix[i], query[count])
+		} else {
+			match = prefix[i] == query[count]
+		}
+
+		if !match {
 			if count+idx > 0 {
 				skipped++
 			}
@@ -274,9 +288,10 @@ func fuzzyMatchCount(prefix, query Prefix, idx int) (count, skipped int) {
 }
 
 // VisitSubstring takes a substring and visits all the nodes that contain this substring
-func (node *Trie) VisitSubstring(substring Prefix, visitor VisitorFunc) error {
+func (node *Trie) VisitSubstring(substring Prefix, caseInsensitive bool, visitor VisitorFunc) error {
 	var (
 		m            uint64
+		cmp          uint64
 		i            int
 		p            potentialSubtree
 		suffixLen    int
@@ -298,7 +313,15 @@ func (node *Trie) VisitSubstring(substring Prefix, visitor VisitorFunc) error {
 
 		searchBytes := append(p.prefix[len(p.prefix)-suffixLen:], p.node.prefix...)
 
-		if bytes.Contains(searchBytes, substring) {
+		contains := false
+
+		if caseInsensitive {
+			contains = bytes.Contains(bytes.ToUpper(searchBytes), bytes.ToUpper(substring))
+		} else {
+			contains = bytes.Contains(searchBytes, substring)
+		}
+
+		if contains {
 			fullPrefix := append(p.prefix, p.node.prefix...)
 			err := p.node.walk(Prefix(""), func(prefix Prefix, item Item) error {
 				key := make([]byte, len(fullPrefix), len(fullPrefix)+len(prefix))
@@ -322,11 +345,16 @@ func (node *Trie) VisitSubstring(substring Prefix, visitor VisitorFunc) error {
 		copy(newPrefix, p.prefix)
 		newPrefix = append(newPrefix, p.node.prefix...)
 
-		overLap := overlapLength(newPrefix, substring)
+		overLap := overlapLength(newPrefix, substring, caseInsensitive)
 		m = makePrefixMask(substring[overLap:])
 
 		for _, c := range p.node.children.getChildren() {
-			if c != nil && (c.mask&m == m) {
+			if caseInsensitive {
+				cmp = caseInsensitiveMask(c.mask)
+			} else {
+				cmp = c.mask
+			}
+			if c != nil && (cmp&m == m) {
 				potential = append(potential, potentialSubtree{
 					node:   c,
 					prefix: newPrefix,
@@ -338,7 +366,7 @@ func (node *Trie) VisitSubstring(substring Prefix, visitor VisitorFunc) error {
 	return nil
 }
 
-func overlapLength(prefix, query Prefix) int {
+func overlapLength(prefix, query Prefix, caseInsensitive bool) int {
 	startLength := len(query) - 1
 	if len(prefix) < startLength {
 		startLength = len(prefix)
@@ -346,7 +374,11 @@ func overlapLength(prefix, query Prefix) int {
 	for i := startLength; i > 0; i-- {
 		suffix := prefix[len(prefix)-i:]
 		queryPrefix := query[:i]
-		if bytes.Equal(suffix, queryPrefix) {
+		if caseInsensitive {
+			if bytes.EqualFold(suffix, queryPrefix) {
+				return i
+			}
+		} else if bytes.Equal(suffix, queryPrefix) {
 			return i
 		}
 	}
@@ -356,7 +388,7 @@ func overlapLength(prefix, query Prefix) int {
 
 // VisitPrefixes visits only nodes that represent prefixes of key.
 // To say the obvious, returning SkipSubtree from visitor makes no sense here.
-func (trie *Trie) VisitPrefixes(key Prefix, visitor VisitorFunc) error {
+func (trie *Trie) VisitPrefixes(key Prefix, caseInsensitive bool, visitor VisitorFunc) error {
 	// Nil key not allowed.
 	if key == nil {
 		panic(ErrNilPrefix)
@@ -373,7 +405,7 @@ func (trie *Trie) VisitPrefixes(key Prefix, visitor VisitorFunc) error {
 	offset := 0
 	for {
 		// Compute what part of prefix matches.
-		common := node.longestCommonPrefixLength(key)
+		common := node.longestCommonPrefixLength(key, caseInsensitive)
 		key = key[common:]
 		offset += common
 
@@ -584,6 +616,15 @@ func makePrefixMask(key Prefix) uint64 {
 	return mask
 }
 
+const upperBits = 0xFFFFFFC00
+const lowerBits = 0x3FFFFFF000000000
+
+func caseInsensitiveMask(mask uint64) uint64 {
+	mask |= (mask & upperBits) << uint64(26)
+	mask |= (mask & lowerBits) >> uint64(26)
+	return mask
+}
+
 var charmap = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.-"
 
 func (trie *Trie) put(key Prefix, item Item, replace bool) (inserted bool) {
@@ -615,7 +656,7 @@ func (trie *Trie) put(key Prefix, item Item, replace bool) (inserted bool) {
 
 	for {
 		// Compute the longest common prefix length.
-		common = node.longestCommonPrefixLength(key)
+		common = node.longestCommonPrefixLength(key, false)
 		key = key[common:]
 
 		// Only a part matches, split.
@@ -716,7 +757,7 @@ func (trie *Trie) findSubtree(prefix Prefix) (parent *Trie, root *Trie, found bo
 	root = trie
 	for {
 		// Compute what part of prefix matches.
-		common := root.longestCommonPrefixLength(prefix)
+		common := root.longestCommonPrefixLength(prefix, false)
 		prefix = prefix[common:]
 
 		// We used up the whole prefix, subtree found.
@@ -753,7 +794,7 @@ func (trie *Trie) findSubtreePath(prefix Prefix) (path []*Trie, found bool, left
 		subtreePath = append(subtreePath, root)
 
 		// Compute what part of prefix matches.
-		common := root.longestCommonPrefixLength(prefix)
+		common := root.longestCommonPrefixLength(prefix, false)
 		prefix = prefix[common:]
 
 		// We used up the whole prefix, subtree found.
@@ -809,10 +850,26 @@ func (trie *Trie) walk(actualRootPrefix Prefix, visitor VisitorFunc) error {
 	return trie.children.walk(&prefix, visitor)
 }
 
-func (trie *Trie) longestCommonPrefixLength(prefix Prefix) (i int) {
-	for ; i < len(prefix) && i < len(trie.prefix) && prefix[i] == trie.prefix[i]; i++ {
+func (trie *Trie) longestCommonPrefixLength(prefix Prefix, caseInsensitive bool) (i int) {
+	for ; i < len(prefix) && i < len(trie.prefix); i++ {
+		p := prefix[i]
+		t := trie.prefix[i]
+
+		if caseInsensitive {
+			if !(matchCaseInsensitive(t, p)) {
+				break
+			}
+		} else {
+			if p != t {
+				break
+			}
+		}
 	}
 	return
+}
+
+func matchCaseInsensitive(a byte, b byte) bool {
+	return a == b+32 || b == a+32 || a == b
 }
 
 func (trie *Trie) dump() string {

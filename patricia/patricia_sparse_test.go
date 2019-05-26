@@ -376,7 +376,7 @@ func TestTrie_VisitPrefixes(t *testing.T) {
 
 	var counter int
 	word := []byte("Pepa")
-	if err := trie.VisitPrefixes(word, func(prefix Prefix, item Item) error {
+	if err := trie.VisitPrefixes(word, false, func(prefix Prefix, item Item) error {
 		t.Logf("VISITING prefix=%q, item=%v", prefix, item)
 		if !bytes.HasPrefix(word, prefix) {
 			t.Errorf("Unexpected prefix encountered, %q is not a prefix of %q",
@@ -631,19 +631,88 @@ func TestTrie_compact(t *testing.T) {
 	})
 }
 
-func TestTrie_longestCommonPrefixLenght(t *testing.T) {
-	trie := NewTrie()
-	trie.prefix = []byte("1234567890")
+func TestTrie_longestCommonPrefixLength(t *testing.T) {
+	type args struct {
+		prefix          Prefix
+		caseInsensitive bool
+	}
 
-	switch {
-	case trie.longestCommonPrefixLength([]byte("")) != 0:
-		t.Fail()
-	case trie.longestCommonPrefixLength([]byte("12345")) != 5:
-		t.Fail()
-	case trie.longestCommonPrefixLength([]byte("123789")) != 3:
-		t.Fail()
-	case trie.longestCommonPrefixLength([]byte("12345678901")) != 10:
-		t.Fail()
+	tests := []struct {
+		prefix Prefix
+		args   args
+		want   int
+	}{
+		{
+			Prefix("1234567890"),
+			args{
+				Prefix(""),
+				false,
+			},
+			0,
+		},
+		{
+			Prefix("1234567890"),
+			args{
+				Prefix("12345"),
+				false,
+			},
+			5,
+		},
+		{
+			Prefix("1234567890"),
+			args{
+				Prefix("123789"),
+				false,
+			},
+			3,
+		},
+		{
+			Prefix("1234567890"),
+			args{
+				Prefix("12345678901"),
+				false,
+			},
+			10,
+		},
+		{
+
+			Prefix("aBcDeFg"),
+			args{
+				Prefix("abcd"),
+				true,
+			},
+			4,
+		},
+		{
+
+			Prefix("aBcDeFg"),
+			args{
+				Prefix("ABCDEF"),
+				true,
+			},
+			6,
+		},
+		{
+
+			Prefix("eeffgghh"),
+			args{
+				Prefix("eEfFGgH"),
+				true,
+			},
+			7,
+		},
+	}
+
+	for _, test := range tests {
+		trie := NewTrie()
+		trie.prefix = test.prefix
+
+		ret := trie.longestCommonPrefixLength(test.args.prefix,
+			test.args.caseInsensitive)
+
+		if ret != test.want {
+			t.Errorf("unexpected return value, expected %d, got %d", test.want, ret)
+		}
 	}
 }
 
@@ -685,7 +754,7 @@ func ExampleTrie() {
 
 	// Walk prefixes.
 	prefix := Prefix("Karel Hynek Macha je kouzelnik")
-	trie.VisitPrefixes(prefix, printItem)
+	trie.VisitPrefixes(prefix, false, printItem)
 	// "Karel Hynek Macha": 10
 
 	// Delete some items.

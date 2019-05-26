@@ -210,25 +210,29 @@ func TestTrie_DeleteCorrectMasks(t *testing.T) {
 
 }
 
-func TestTrie_FuzzyCollect(t *testing.T) {
-	trie := NewTrie()
-	data := []testData{
-		{"Pepan", "Pepan Zdepan", success},
-		{"Pepin", "Pepin Omacka", success},
-		{"Honza", "Honza Novak", success},
-		{"Jenik", "Jenik Poustevnicek", success},
-		{"Pepan", "Pepan Dupan", failure},
-		{"Karel", "Karel Pekar", success},
-		{"Jenak", "Jenak Poustevnicek", success},
-		{"Pepanek", "Pepanek Zemlicka", success},
+func populateTrie(t *testing.T) *Trie {
+	data := []string{
+		"Pepan",
+		"Pepin",
+		"Honza",
+		"Jenik",
+		"Karel",
+		"Jenak",
+		"Pepanek",
 	}
 
+	trie := NewTrie()
 	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		if ok := trie.Insert(Prefix(v.key), v.value); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
+		if ok := trie.Insert(Prefix(v), struct{}{}); !ok {
+			t.Errorf("Couldn't insert item %s", v)
 		}
 	}
+
+	return trie
+}
+
+func TestTrie_FuzzyCollect(t *testing.T) {
+	trie := populateTrie(t)
 
 	type testResult struct {
 		wantKey     string
@@ -236,13 +240,15 @@ func TestTrie_FuzzyCollect(t *testing.T) {
 	}
 
 	type testData struct {
-		query       string
-		wantResults []testResult
+		query           string
+		caseInsensitive bool
+		wantResults     []testResult
 	}
 
 	testQueries := []testData{
 		{
 			"Ppn",
+			false,
 			[]testResult{
 				{"Pepan", 2},
 				{"Pepin", 2},
@@ -251,20 +257,40 @@ func TestTrie_FuzzyCollect(t *testing.T) {
 		},
 		{
 			"Ha",
+			false,
 			[]testResult{
 				{"Honza", 3},
 			},
 		},
 		{
 			"nza",
+			false,
 			[]testResult{
 				{"Honza", 0},
 			},
 		},
 		{
 			"eni",
+			false,
 			[]testResult{
 				{"Jenik", 0},
+			},
+		},
+		{
+			"jk",
+			true,
+			[]testResult{
+				{"Jenik", 3},
+				{"Jenak", 3},
+			},
+		},
+		{
+			"ppn",
+			true,
+			[]testResult{
+				{"Pepan", 2},
+				{"Pepin", 2},
+				{"Pepanek", 2},
 			},
 		},
 	}
@@ -272,7 +298,7 @@ func TestTrie_FuzzyCollect(t *testing.T) {
 	for _, data := range testQueries {
 		resultMap := make(map[string]int)
 		t.Logf("QUERY %s", data.query)
-		trie.VisitFuzzy(Prefix(data.query), func(prefix Prefix, item Item, skipped int) error {
+		trie.VisitFuzzy(Prefix(data.query), data.caseInsensitive, func(prefix Prefix, item Item, skipped int) error {
 			// result := testResult{string(prefix), skipped}
 			resultMap[string(prefix)] = skipped
 			return nil
@@ -295,69 +321,69 @@ func TestTrie_FuzzyCollect(t *testing.T) {
 }
 
 func TestTrie_SubstringCollect(t *testing.T) {
-	trie := NewTrie()
-	data := []testData{
-		{"Pepan", "Pepan Zdepan", success},
-		{"Pepin", "Pepin Omacka", success},
-		{"Honza", "Honza Novak", success},
-		{"Jenik", "Jenik Poustevnicek", success},
-		{"Pepan", "Pepan Dupan", failure},
-		{"Karel", "Karel Pekar", success},
-		{"Jenak", "Jenak Poustevnicek", success},
-		{"Pepanek", "Pepanek Zemlicka", success},
-	}
-
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		if ok := trie.Insert(Prefix(v.key), v.value); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
-
-	type testResult struct {
-		wantKey string
-	}
+	trie := populateTrie(t)
 
 	type testData struct {
-		query       string
-		wantResults []testResult
+		query           string
+		caseInsensitive bool
+		wantResults     []string
 	}
 
 	testQueries := []testData{
 		{
 			"epa",
-			[]testResult{
-				{"Pepan"},
-				{"Pepanek"},
+			false,
+			[]string{
+				"Pepan",
+				"Pepanek",
 			},
 		},
 		{
 			"onza",
-			[]testResult{
-				{"Honza"},
+			false,
+			[]string{
+				"Honza",
 			},
 		},
 		{
 			"nza",
-			[]testResult{
-				{"Honza"},
+			false,
+			[]string{
+				"Honza",
 			},
 		},
 		{
 			"l",
-			[]testResult{
-				{"Karel"},
+			false,
+			[]string{
+				"Karel",
 			},
 		},
 		{
 			"a",
-			[]testResult{
-				{"Pepan"},
-				{"Honza"},
-				{"Pepan"},
-				{"Karel"},
-				{"Jenak"},
-				{"Pepanek"},
+			false,
+			[]string{
+				"Pepan",
+				"Honza",
+				"Pepan",
+				"Karel",
+				"Jenak",
+				"Pepanek",
+			},
+		},
+		{
+			"pep",
+			true,
+			[]string{
+				"Pepin",
+				"Pepan",
+			},
+		},
+		{
+			"kar",
+			true,
+			[]string{
+				"Karel",
 			},
 		},
 	}
@@ -365,7 +391,7 @@ func TestTrie_SubstringCollect(t *testing.T) {
 	for _, data := range testQueries {
 		resultMap := make(map[string]bool)
 		t.Logf("QUERY %s", data.query)
-		trie.VisitSubstring(Prefix(data.query), func(prefix Prefix, item Item) error {
+		trie.VisitSubstring(Prefix(data.query), true, func(prefix Prefix, item Item) error {
 			// result := testResult{string(prefix), skipped}
 			resultMap[string(prefix)] = true
 			return nil
@@ -373,8 +399,8 @@ func TestTrie_SubstringCollect(t *testing.T) {
 		t.Logf("got result set %v\n", resultMap)
 
 		for _, want := range data.wantResults {
-			if _, ok := resultMap[want.wantKey]; !ok {
-				t.Errorf("item %s not found in result set\n", want.wantKey)
+			if _, ok := resultMap[want]; !ok {
+				t.Errorf("item %s not found in result set\n", want)
 				continue
 			}
 		}
