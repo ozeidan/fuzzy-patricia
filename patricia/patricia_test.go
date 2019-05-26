@@ -7,6 +7,7 @@ package patricia
 
 import (
 	"crypto/rand"
+	mrand "math/rand"
 	"reflect"
 	"testing"
 )
@@ -386,6 +387,19 @@ func TestTrie_SubstringCollect(t *testing.T) {
 				"Karel",
 			},
 		},
+		{
+			"",
+			false,
+			[]string{
+				"Pepan",
+				"Pepin",
+				"Honza",
+				"Jenik",
+				"Karel",
+				"Jenak",
+				"Pepanek",
+			},
+		},
 	}
 
 	for _, data := range testQueries {
@@ -442,4 +456,102 @@ func Test_makePrefixMask(t *testing.T) {
 			t.Errorf("Unexpected bitmask, wanted: %b, got %b\n", d.wanted, got)
 		}
 	}
+}
+
+const (
+	amountWords = 100000
+	wordLength  = 10
+	queryLength = 10
+)
+
+var benchmarkTrie *Trie
+
+func populateBenchmarkTrie(superDenseChildList bool) {
+	benchmarkTrie = NewTrie()
+	SetUseSuperDenseChildLists(superDenseChildList)
+
+	for i := 0; i < amountWords; i++ {
+		benchmarkTrie.Insert(Prefix(mrandBytes(wordLength)), struct{}{})
+	}
+}
+
+type visitFunc func(prefix Prefix, caseInsensitive bool, visitor VisitorFunc) error
+
+func benchmarkVisit(caseInsensitive bool, visitor visitFunc, b *testing.B) {
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		visitor(Prefix(mrandBytes(queryLength)), caseInsensitive, func(prefix Prefix, item Item) error {
+			return nil
+		})
+	}
+}
+
+func benchmarkVisitFuzzy(caseInsensitive bool, b *testing.B) {
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		benchmarkTrie.VisitFuzzy(Prefix(mrandBytes(queryLength)), caseInsensitive, func(prefix Prefix, item Item, skipped int) error {
+			return nil
+		})
+	}
+}
+
+func BenchmarkPrefix(b *testing.B) {
+	populateBenchmarkTrie(false)
+	benchmarkVisit(false, benchmarkTrie.VisitPrefixes, b)
+}
+func BenchmarkPrefixCaseInsensitive(b *testing.B) {
+	populateBenchmarkTrie(false)
+	benchmarkVisit(true, benchmarkTrie.VisitPrefixes, b)
+}
+func BenchmarkPrefixSuperDense(b *testing.B) {
+	populateBenchmarkTrie(true)
+	benchmarkVisit(false, benchmarkTrie.VisitPrefixes, b)
+}
+func BenchmarkPrefixCaseInsensitiveSuperDense(b *testing.B) {
+	populateBenchmarkTrie(true)
+	benchmarkVisit(true, benchmarkTrie.VisitPrefixes, b)
+}
+func BenchmarkSubstring(b *testing.B) {
+	populateBenchmarkTrie(false)
+	benchmarkVisit(false, benchmarkTrie.VisitSubstring, b)
+}
+func BenchmarkSubstringCaseInsensitive(b *testing.B) {
+	populateBenchmarkTrie(false)
+	benchmarkVisit(true, benchmarkTrie.VisitSubstring, b)
+}
+func BenchmarkSubstringSuperDense(b *testing.B) {
+	populateBenchmarkTrie(true)
+	benchmarkVisit(false, benchmarkTrie.VisitSubstring, b)
+}
+func BenchmarkSubstringCaseInsensitiveSuperDense(b *testing.B) {
+	populateBenchmarkTrie(true)
+	benchmarkVisit(true, benchmarkTrie.VisitSubstring, b)
+}
+
+func BenchmarkFuzzy(b *testing.B) {
+	populateBenchmarkTrie(false)
+	benchmarkVisitFuzzy(false, b)
+}
+func BenchmarkFuzzyCaseInsensitive(b *testing.B) {
+	populateBenchmarkTrie(false)
+	benchmarkVisitFuzzy(true, b)
+}
+func BenchmarkFuzzySuperDense(b *testing.B) {
+	populateBenchmarkTrie(true)
+	benchmarkVisitFuzzy(false, b)
+}
+func BenchmarkFuzzyCaseInsensitiveSuperDense(b *testing.B) {
+	populateBenchmarkTrie(true)
+	benchmarkVisitFuzzy(true, b)
+}
+
+func mrandBytes(length int) []byte {
+	bytes := make([]byte, length)
+	for i := 0; i < length; i++ {
+		bytes = append(bytes, byte(mrand.Intn(75)+'0'))
+	}
+
+	return bytes
 }
