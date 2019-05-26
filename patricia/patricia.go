@@ -188,6 +188,12 @@ type potentialSubtree struct {
 }
 
 func (node *Trie) VisitFuzzy(partial Prefix, caseInsensitive bool, visitor FuzzyVisitorFunc) error {
+	if len(partial) == 0 {
+		return node.VisitPrefixes(partial, caseInsensitive, func(prefix Prefix, item Item) error {
+			return visitor(prefix, item, 0)
+		})
+	}
+
 	var (
 		m   uint64
 		cmp uint64
@@ -289,6 +295,10 @@ func fuzzyMatchCount(prefix, query Prefix, idx int, caseInsensitive bool) (count
 
 // VisitSubstring takes a substring and visits all the nodes that contain this substring
 func (node *Trie) VisitSubstring(substring Prefix, caseInsensitive bool, visitor VisitorFunc) error {
+	if len(substring) == 0 {
+		return node.VisitSubtree(substring, visitor)
+	}
+
 	var (
 		m            uint64
 		cmp          uint64
